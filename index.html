@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://images.unsplash.com">
+<script src="https://unpkg.com/lenis@1.1.20/dist/lenis.min.js" defer></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Bodoni+Moda:opsz,wght@6..96,500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -389,6 +390,35 @@ h1 em,h2 em{font-style:normal;color:var(--accent-ink)}
   .zoom .cap{opacity:1!important}
   .mani .w{color:var(--ink)}
 }
+
+/* ---------- smooth scroll (desktop) ---------- */
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-stopped{overflow:clip}
+.amb i{animation-play-state:paused}
+.amb.run i{animation-play-state:running}
+
+/* ---------- scroll-linked motion on the compositor (in sync with scrolling); JS fallback where unsupported ---------- */
+@supports (animation-timeline: view()) {
+  @media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) {
+    .bgp{view-timeline:--bgp block}
+    .bgp .par{animation:sd-par linear both;animation-timeline:--bgp}
+    .zoom{view-timeline:--zoom block}
+    .zoom .frame{will-change:auto;animation:sd-zoom linear both;animation-timeline:--zoom;animation-range:contain 0% contain 100%}
+    .zoom .cap{will-change:auto;animation:sd-cap linear both;animation-timeline:--zoom;animation-range:contain 0% contain 100%}
+    .hz{view-timeline:--hz block}
+    .track{will-change:auto;animation:sd-track linear both;animation-timeline:--hz;animation-range:contain 0% contain 100%}
+    .bar i{animation:sd-bar linear both;animation-timeline:--hz;animation-range:contain 0% contain 100%}
+    .steps{view-timeline:--steps block}
+    .steps .rail i{will-change:auto;animation:sd-bar-y linear both;animation-timeline:--steps;animation-range:cover 45vh cover calc(100% - 55vh)}
+  }
+}
+@keyframes sd-par{from{transform:translate3d(0,-5%,0)}to{transform:translate3d(0,5%,0)}}
+@keyframes sd-zoom{0%{transform:scale(.5);animation-timing-function:cubic-bezier(.33,1,.68,1)}74%,100%{transform:scale(1)}}
+@keyframes sd-cap{0%,45%{opacity:0;transform:translate3d(0,30px,0)}78%,100%{opacity:1;transform:none}}
+@keyframes sd-track{from{transform:translate3d(0,0,0)}to{transform:translate3d(calc(var(--hzmax,0px) * -1),0,0)}}
+@keyframes sd-bar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes sd-bar-y{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 </style>
 </head>
 <body>
@@ -677,6 +707,9 @@ h1 em,h2 em{font-style:normal;color:var(--accent-ink)}
   const touch = matchMedia("(hover:none),(pointer:coarse)").matches;
   const reduce = matchMedia("(prefers-reduced-motion:reduce)").matches;
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  // scroll-linked transforms run in CSS on the compositor when supported; JS only drives discrete states
+  const sda = !touch && !reduce && CSS.supports("animation-timeline: view()");
+  let lenis = null;
 
   // WhatsApp links (href="#agendar" stays as no-JS fallback)
   $$(".js-wa").forEach(a => a.href = waURL(a.dataset.msg || "Olá! Vim pelo site da Hart Clinic."));
@@ -694,7 +727,7 @@ h1 em,h2 em{font-style:normal;color:var(--accent-ink)}
 
   // menu
   const mb = $("#menuBtn");
-  const setMenu = o => { document.body.classList.toggle("menu-open", o); mb.setAttribute("aria-expanded", o); mb.setAttribute("aria-label", o ? "Fechar menu" : "Abrir menu"); document.body.style.overflow = o ? "hidden" : ""; };
+  const setMenu = o => { document.body.classList.toggle("menu-open", o); mb.setAttribute("aria-expanded", o); mb.setAttribute("aria-label", o ? "Fechar menu" : "Abrir menu"); document.body.style.overflow = o ? "hidden" : ""; if (lenis) o ? lenis.stop() : lenis.start(); };
   mb.addEventListener("click", () => setMenu(!document.body.classList.contains("menu-open")));
   $$("#drawer a").forEach(a => a.addEventListener("click", () => setMenu(false)));
   addEventListener("keydown", e => e.key === "Escape" && setMenu(false));
@@ -752,6 +785,7 @@ h1 em,h2 em{font-style:normal;color:var(--accent-ink)}
     if (!touch && !reduce && innerWidth >= 1024) {
       M.hzMax = track.scrollWidth - innerWidth;
       hz.style.height = `${M.hzMax + innerHeight}px`;
+      track.style.setProperty("--hzmax", `${M.hzMax}px`);
     } else { hz.style.height = ""; M.hzMax = 0; }
     M.vh = innerHeight;
     M.heroH = $(".hero").offsetHeight;
@@ -775,7 +809,7 @@ h1 em,h2 em{font-style:normal;color:var(--accent-ink)}
     const n = reduce ? units.length : Math.round(mp * units.length);
     if (n !== lit) { const a = Math.min(n, lit < 0 ? 0 : lit), b = Math.max(n, lit < 0 ? units.length : lit); for (let i = a; i < b; i++) units[i].classList.toggle("on", i < n); lit = n; }
 
-    if (!touch && !reduce) {
+    if (!touch && !reduce && !sda) {
       // parallax photo backgrounds
       for (const p of pars) if (y + vh > p.t && y < p.t + p.h) p.el.style.transform = `translate3d(0,${((p.t + p.h / 2 - y - vh / 2) * -p.k).toFixed(1)}px,0)`;
       // zoom-out space
@@ -785,19 +819,21 @@ h1 em,h2 em{font-style:normal;color:var(--accent-ink)}
         const o = clamp((zp - .45) * 3);
         zc.style.opacity = o.toFixed(3); zc.style.transform = `translate3d(0,${((1 - o) * 30).toFixed(1)}px,0)`;
       }
-      // horizontal gallery
-      if (M.hzMax > 0 && y + vh > M.hz.t && y < M.hz.t + M.hz.h) {
-        const hp = clamp((y - M.hz.t) / (M.hz.h - vh));
+    }
+    // horizontal gallery
+    if (M.hzMax > 0 && y + vh > M.hz.t && y < M.hz.t + M.hz.h) {
+      const hp = clamp((y - M.hz.t) / (M.hz.h - vh));
+      if (!sda) {
         track.style.transform = `translate3d(${(-hp * M.hzMax).toFixed(1)}px,0,0)`;
         hzbar.style.transform = `scaleX(${hp.toFixed(4)})`;
-        const i = Math.min(cards.length, 1 + Math.floor(hp * cards.length));
-        if (i !== hzIdx) hzc.textContent = `${String(hzIdx = i).padStart(2, "0")} / ${String(cards.length).padStart(2, "0")}`;
       }
+      const i = Math.min(cards.length, 1 + Math.floor(hp * cards.length));
+      if (i !== hzIdx) hzc.textContent = `${String(hzIdx = i).padStart(2, "0")} / ${String(cards.length).padStart(2, "0")}`;
     }
 
     // method rail + steps
     if (y + vh > M.steps.t && y < M.steps.t + M.steps.h + vh) {
-      rail.style.transform = `scaleY(${clamp((y + vh * .55 - M.steps.t) / M.steps.h).toFixed(4)})`;
+      if (!sda) rail.style.transform = `scaleY(${clamp((y + vh * .55 - M.steps.t) / M.steps.h).toFixed(4)})`;
       M.stepT.forEach((t, i) => { const on = t - y < vh * .58; if (on !== stepOn[i]) stepEls[i].classList.toggle("on", stepOn[i] = on); });
     }
   };
@@ -810,6 +846,24 @@ h1 em,h2 em{font-style:normal;color:var(--accent-ink)}
   if (document.fonts) document.fonts.ready.then(remeasure);
   new ResizeObserver(remeasure).observe(document.querySelector("main"));
   measure();
+
+  // ambient gradients only animate while on screen
+  const aio = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle("run", e.isIntersecting)));
+  $$(".amb").forEach(a => aio.observe(a));
+
+  // smooth wheel scrolling on desktop (Lenis); frame() runs in the same tick as each scroll step
+  addEventListener("DOMContentLoaded", () => {
+    if (touch || reduce || !window.Lenis) return;
+    lenis = new Lenis({ lerp: .1, smoothWheel: true });
+    const tick = t => { lenis.raf(t); requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    lenis.on("scroll", frame);
+    $$('a[href^="#"]').forEach(a => a.addEventListener("click", e => {
+      const id = a.getAttribute("href"), el = id.length > 1 && document.querySelector(id);
+      if (!el) return;
+      e.preventDefault(); lenis.scrollTo(el, { duration: 1.4 });
+    }));
+  });
 
   if (touch) {
     track.addEventListener("scroll", () => {
