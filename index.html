@@ -367,12 +367,6 @@ h1 em,h2 em{font-style:normal;color:var(--accent-ink)}
 }
 /* touch: native scroll, nothing pinned, no scroll-linked transforms */
 @media (hover:none),(pointer:coarse){
-  .zoom{height:auto;padding:0 var(--gut)}
-  .zoom .stick{position:relative;height:auto}
-  .zoom .frame{transform:none;border-radius:14px;aspect-ratio:4/5;max-height:80svh}
-  .zoom .frame img{transform:scale(1.15);transition:transform 1.6s var(--ease)}
-  .zoom .frame.in img{transform:none}
-  .zoom .cap{opacity:1}
   .hz{height:auto!important}
   .hz .stick{position:relative;height:auto;padding:90px 0}
   .track{overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:6px}
@@ -419,6 +413,21 @@ html.lenis,html.lenis body{height:auto}
 @keyframes sd-track{from{transform:translate3d(0,0,0)}to{transform:translate3d(calc(var(--hzmax,0px) * -1),0,0)}}
 @keyframes sd-bar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes sd-bar-y{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+/* ---------- space section on phones/tablets: static, photo dissolving into the page like the hero ---------- */
+@media (max-width:1023px),(hover:none),(pointer:coarse){
+  .zoom{height:auto;padding:0 0 clamp(72px,14vw,120px)}
+  .zoom .stick{position:relative;top:auto;height:auto;display:block;overflow:visible}
+  .zoom .frame{transform:none!important;animation:none!important;will-change:auto;border-radius:0;height:auto;overflow:visible;background:none}
+  .zoom .frame img{width:100%;height:min(74svh,640px);object-position:56% 50%}
+  .zoom .frame.grain::after{bottom:auto;height:min(74svh,640px)}
+  .zoom .shade{bottom:auto;height:min(74svh,640px);background:linear-gradient(0deg,var(--bg) 0%,rgba(243,242,239,.88) 16%,rgba(243,242,239,0) 46%),linear-gradient(180deg,var(--bg) 0%,rgba(243,242,239,0) 16%)}
+  .zoom .cap{position:relative;left:auto;right:auto;bottom:auto;display:block;margin-top:-118px;padding:0 var(--gut);color:var(--ink);opacity:1!important;transform:none!important;animation:none!important;will-change:auto}
+  .zoom .cap h2{color:var(--ink)}
+  .zoom .cap h2 em{color:var(--accent-ink)}
+  .zoom .cap p{color:var(--ink-2);margin-top:16px;font-size:16px}
+  .zoom .cap .todo{color:#8A5A2B}
+}
 </style>
 </head>
 <body>
@@ -745,7 +754,6 @@ html.lenis,html.lenis body{height:auto}
     e.target.classList.add("in"); io.unobserve(e.target);
   }), { rootMargin: "0px 0px -12% 0px" });
   $$(".rv,.rv-mask").forEach((el, i) => { el.style.transitionDelay = `${(i % 3) * 70}ms`; io.observe(el); });
-  if (touch) io.observe($("#zframe"));
   const fmt = (v, d) => v.toFixed(d).replace(".", ",");
   const cio = new IntersectionObserver(es => es.forEach(e => {
     if (!e.isIntersecting) return; cio.unobserve(e.target);
